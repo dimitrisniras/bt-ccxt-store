@@ -86,6 +86,7 @@ class CCXTFeed(with_metaclass(MetaCCXTFeed, DataBase)):
         self._data = deque()  # data queue for price data
         self._last_id = ''  # last processed trade id for ohlcv
         self._last_ts = 0  # last processed timestamp for ohlcv
+        self._last_ohlc = [] # last retrieved ohlc
 
     def start(self, ):
         DataBase.start(self)
@@ -108,6 +109,9 @@ class CCXTFeed(with_metaclass(MetaCCXTFeed, DataBase)):
                 if self._timeframe == bt.TimeFrame.Ticks:
                     return self._load_ticks()
                 else:
+                    start = datetime.utcnow()
+                    if start.second < 5:
+                         time.sleep(5 - start.second)
                     self._fetch_ohlcv()
                     ret = self._load_ohlcv()
                     if self.p.debug:
@@ -183,6 +187,9 @@ class CCXTFeed(with_metaclass(MetaCCXTFeed, DataBase)):
                 if None in ohlcv:
                     continue
 
+                if len(self._last_ohlc) == 0:
+                    self._last_ohlc = ohlcv
+
                 tstamp = ohlcv[0]
 
                 # Prevent from loading incomplete data
@@ -191,9 +198,12 @@ class CCXTFeed(with_metaclass(MetaCCXTFeed, DataBase)):
 
                 if tstamp > self._last_ts:
                     if self.p.debug:
-                        print('Adding: {}'.format(ohlcv))
-                    self._data.append(ohlcv)
+                        print('Adding: {}'.format(self._last_ohlc))
+                    self._data.append(self._last_ohlc)
                     self._last_ts = tstamp
+                    since = self._last_ts
+                    
+                self._last_ohlc = ohlcv
 
             if dlen == len(self._data):
                 break
